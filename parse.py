@@ -1,6 +1,8 @@
 import csv
+import json
 
 names = []
+links = []
 
 with open('data.csv') as csv_file:
     csv_reader = csv.reader(csv_file, delimiter =',')
@@ -24,19 +26,21 @@ with open('data.csv') as csv_file:
                     if src_col == "0":
                         pass
                     elif src_col == "1":
-                        target_index = source_index
+                        target_index = source_index + 1
                         while target_index < 10:
                             if row[target_index] == "0":
                                 pass
                             elif row[target_index] == "1":
-                                print("one target")
+                                links.append({"source": source_index, "target": target_index})
                             else:
                                 print("bad target data")
                             target_index += 1
                     else:
                         print("this data is not clean" + src_col)
             ctr += 1
-            print(ctr)
+
+jObject = {"nodes": names, "links": links}
+obj = print(json.dumps(jObject))
 
 
 
