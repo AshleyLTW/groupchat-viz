@@ -13,7 +13,7 @@ var svg = d3.select("#my_dataviz")
         "translate(" + margin.left + "," + margin.top + ")");
 
 // Read dummy data
-d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_network.json", function( data) {
+d3.json("json_data.json", function( data) {
 
     // List of node names
     var allNodes = data.nodes.map(function(d){return d.name})
@@ -24,7 +24,7 @@ d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/d
         .domain(allNodes)
 
     // Add the circle for the nodes
-    svg
+    var nodes = svg
         .selectAll("mynodes")
         .data(data.nodes)
         .enter()
@@ -35,7 +35,7 @@ d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/d
         .style("fill", "#69b3a2")
 
     // And give them a label
-    svg
+    var labels = svg
         .selectAll("mylabels")
         .data(data.nodes)
         .enter()
@@ -55,7 +55,7 @@ d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/d
     // Cool, now if I do idToNode["2"].name I've got the name of the node with id 2
 
     // Add the links
-    svg
+    var links = svg
         .selectAll('mylinks')
         .data(data.links)
         .enter()
@@ -73,4 +73,31 @@ d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/d
         .style("fill", "none")
         .attr("stroke", "black")
 
+    // Add the highlighting functionnality
+    nodes
+        .on('mouseover', function (d) {
+            // Highlight the nodes: every node is green except of him
+            nodes.style('fill', "#B8B8B8")
+            d3.select(this).style('fill', '#69b3b2')
+            // Highlight the connections
+            links
+                .style('stroke', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? '#69b3b2' : '#b8b8b8';})
+                .style('stroke-width', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 4 : 1;})
+        })
+        .on('mouseout', function (d) {
+            nodes.style('fill', "#69b3a2")
+            links
+                .style('stroke', 'black')
+                .style('stroke-width', '1')
+        })
 })
+
+// text hover nodes
+svg
+    .append("text")
+    .attr("text-anchor", "middle")
+    .style("fill", "#B8B8B8")
+    .style("font-size", "17px")
+    .attr("x", 50)
+    .attr("y", 10)
+    .html("Hover nodes")
