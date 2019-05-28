@@ -29,7 +29,7 @@ with open('data.csv') as csv_file:
                         pass
                     elif src_col == "1":
                         target_index = source_index + 1
-                        while target_index < 10:
+                        while target_index <= 10:
                             if row[target_index] == "0":
                                 pass
                             elif row[target_index] == "1":
