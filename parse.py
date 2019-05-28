@@ -47,7 +47,14 @@ set_links = set(links)
 link_frequency = Counter(links)
 for link in set_links:
     freq = link_frequency[link]
-    weighted_links.append({"source": link[0], "target": link[1], "value": freq})
+    weighted_freq = freq
+    if freq < 5:
+        weighted_freq = freq * 0.1
+    elif freq < 9:
+        weighted_freq = freq * 0.6
+    else:
+        weighted_freq = freq * 1.2
+    weighted_links.append({"source": link[0], "target": link[1], "value": weighted_freq})
 
 
 jObject = {"nodes": names, "links": weighted_links}
