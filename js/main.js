@@ -1,103 +1,182 @@
-// set the dimensions and margins of the graph
-var margin = {top: 20, right: 30, bottom: 20, left: 30},
-    width = 450 - margin.left - margin.right,
-    height = 300 - margin.top - margin.bottom;
+var miserables = require('./json_data.json')
 
-// append the svg object to the body of the page
-var svg = d3.select("#my_dataviz")
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform",
-        "translate(" + margin.left + "," + margin.top + ")");
+var i,
+    width = 960,
+    height = 500,
+    transitionTime = 2500,
+    spacing = 11,
+    margin = 20,
+    nodeY = 380,
+    nodes = miserables.nodes,
+    links = miserables.links,
+    colors = d3.scale.category20(),
+    τ = 2 * Math.PI; // http://tauday.com/tau-manifesto
 
-// Read dummy data
-d3.json("json_data.json", function( data) {
+var svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height)
 
-    // List of node names
-    var allNodes = data.nodes.map(function(d){return d.name})
+function mapRange(value, inMin, inMax, outMin, outMax){
+    var inVal = Math.min(Math.max(value, inMin), inMax);
+    return outMin + (outMax-outMin)*((inVal - inMin)/(inMax-inMin));
+}
 
-    // A linear scale to position the nodes on the X axis
-    var x = d3.scalePoint()
-        .range([0, width])
-        .domain(allNodes)
+// Set each node's value to the sum of all incoming and outgoing link values
+var nodeValMin = 100000000,
+    nodeValMax = 0;
+for(i=0; i<nodes.length; i++){
+    nodes[i].value = 0;
+    nodes[i].displayOrder = i;
+}
+for(i=0; i<links.length; i++){
+    var link = links[i];
+        value = link.value;
+    nodes[link.source].value += link.value;
+    nodes[link.target].value += link.value;
+}
+for(i=0; i<nodes.length; i++){
+    nodeValMin = Math.min(nodeValMin, nodes[i].value);
+    nodeValMax = Math.max(nodeValMax, nodes[i].value);
+}
 
-    // Add the circle for the nodes
-    var nodes = svg
-        .selectAll("mynodes")
-        .data(data.nodes)
-        .enter()
+var arcBuilder = d3.svg.arc()
+    .startAngle(-τ/4)
+    .endAngle(τ/4);
+arcBuilder.setRadii = function(d){
+        var arcHeight = 0.5 * Math.abs(d.x2-d.x1);
+        this
+            .innerRadius(arcHeight - d.thickness/2)
+            .outerRadius(arcHeight + d.thickness/2);
+    };
+function arcTranslation(d){
+    return "translate(" + (d.x1 + d.x2)/2 + "," + nodeY + ")";
+}
+function nodeDisplayX(node){
+    return node.displayOrder * spacing + margin;
+}
+
+var path;
+
+function update(){
+    // DATA JOIN
+    path = svg.selectAll("path")
+        .data(links);
+    // UPDATE
+    path.transition()
+      .duration(transitionTime)
+      .call(pathTween, null);
+    // ENTER
+    path.enter()
+        .append("path")
+        .attr("transform", function(d,i){ 
+            d.x1 = nodeDisplayX(nodes[d.target]);
+            d.x2 = nodeDisplayX(nodes[d.source]);
+            return arcTranslation(d);
+            })
+        .attr("d", function(d,i){
+            d.thickness = 1 + d.value;
+            arcBuilder.setRadii(d);
+            return arcBuilder();
+            });
+
+    // DATA JOIN
+    var circle = svg.selectAll("circle")
+        .data(nodes);
+    // UPDATE
+    circle.transition()
+        .duration(transitionTime)
+        .attr("cx", function(d,i) {return nodeDisplayX(d);});
+    // ENTER
+    circle.enter()
         .append("circle")
-        .attr("cx", function(d){ return(x(d.name))})
-        .attr("cy", height-30)
-        .attr("r", 8)
-        .style("fill", "#69b3a2")
+        .attr("cy", nodeY)
+        .attr("cx", function(d,i) {return nodeDisplayX(d);})
+        .attr("r", function(d,i) {return mapRange(d.value, nodeValMin, nodeValMax, 2.5, 13);})
+        .attr("fill", function(d,i) {return colors(d.group);})
+        .attr("stroke", function(d,i) {return d3.rgb(colors(d.group)).darker(1);});
 
-    // And give them a label
-    var labels = svg
-        .selectAll("mylabels")
-        .data(data.nodes)
-        .enter()
+    function textTransform(node){
+        return ("rotate(90 " + (nodeDisplayX(node) - 5) + " " + (nodeY + 12) + ")");
+    }
+    // DATA JOIN
+    var text = svg.selectAll("text")
+        .data(nodes);
+    // UPDATE
+    text.transition()
+        .duration(transitionTime)
+        .attr("x", function(d,i) {return nodeDisplayX(d) - 5;})
+        .attr("transform", function(d,i) { return textTransform(d); });
+    // ENTER
+    text.enter()
         .append("text")
-        .attr("x", function(d){ return(x(d.name))})
-        .attr("y", height-10)
-        .text(function(d){ return(d.name)})
-        .style("text-anchor", "middle")
+        .attr("y", nodeY + 12)
+        .attr("x", function(d,i) {return nodeDisplayX(d) - 5;})
+        .attr("transform", function(d,i) { return textTransform(d); })
+        .attr("font-size", "10px")
+        .text(function(d,i) {return d.nodeName;});
+}
 
-    // Add links between nodes. Here is the tricky part.
-    // In my input data, links are provided between nodes -id-, NOT between node names.
-    // So I have to do a link between this id and the name
-    var idToNode = {};
-    data.nodes.forEach(function (n) {
-        idToNode[n.id] = n;
+doSort(0);
+update();
+
+function pathTween(transition, dummy){
+    transition.attrTween("d", function(d){
+        var interpolateX1 = d3.interpolate(d.x1, nodeDisplayX(nodes[d.target]));
+        var interpolateX2 = d3.interpolate(d.x2, nodeDisplayX(nodes[d.source]));
+        return function(t){
+            d.x1 = interpolateX1(t);
+            d.x2 = interpolateX2(t);
+            arcBuilder.setRadii(d);
+            return arcBuilder();
+        };
     });
-    // Cool, now if I do idToNode["2"].name I've got the name of the node with id 2
 
-    // Add the links
-    var links = svg
-        .selectAll('mylinks')
-        .data(data.links)
-        .enter()
-        .append('path')
-        .attr('d', function (d) {
-            start = x(idToNode[d.source].name)    // X position of start node on the X axis
-            end = x(idToNode[d.target].name)      // X position of end node
-            return ['M', start, height-30,    // the arc starts at the coordinate x=start, y=height-30 (where the starting node is)
-                'A',                            // This means we're gonna build an elliptical arc
-                (start - end)/2, ',',    // Next 2 lines are the coordinates of the inflexion point. Height of this point is proportional with start - end distance
-                (start - end)/2, 0, 0, ',',
-                start < end ? 1 : 0, end, ',', height-30] // We always want the arc on top. So if end is before start, putting 0 here turn the arc upside down.
-                .join(' ');
-        })
-        .style("fill", "none")
-        .attr("stroke", "black")
+    transition.attrTween("transform", function(d){
+        var interpolateX1 = d3.interpolate(d.x1, nodeDisplayX(nodes[d.target]));
+        var interpolateX2 = d3.interpolate(d.x2, nodeDisplayX(nodes[d.source]));
+        return function(t){
+            d.x1 = interpolateX1(t);
+            d.x2 = interpolateX2(t);
+            return arcTranslation(d);
+        };
+    });
+}
 
-    // Add the highlighting functionnality
-    nodes
-        .on('mouseover', function (d) {
-            // Highlight the nodes: every node is green except of him
-            nodes.style('fill', "#B8B8B8")
-            d3.select(this).style('fill', '#69b3b2')
-            // Highlight the connections
-            links
-                .style('stroke', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? '#69b3b2' : '#b8b8b8';})
-                .style('stroke-width', function (link_d) { return link_d.source === d.id || link_d.target === d.id ? 4 : 1;})
-        })
-        .on('mouseout', function (d) {
-            nodes.style('fill', "#69b3a2")
-            links
-                .style('stroke', 'black')
-                .style('stroke-width', '1')
-        })
-})
+d3.select("#selectSort").on("change", function() {
+    doSort(this.selectedIndex);
+    update();
+});
 
-// text hover nodes
-svg
-    .append("text")
-    .attr("text-anchor", "middle")
-    .style("fill", "#B8B8B8")
-    .style("font-size", "17px")
-    .attr("x", 50)
-    .attr("y", 10)
-    .html("Hover nodes")
+function doSort(sortMethod){
+    var nodeMap = [],
+        sortFunciton;
+
+    for(i=0; i<nodes.length; i++){
+        var node = $.extend({index:i}, nodes[i]); // Shallow copy
+        nodeMap.push(node);
+    }
+
+    if (sortMethod == 0){
+        // GROUP
+        sortFunction = function(a, b){
+            return b.group - a.group;
+        };
+    }
+    else if (sortMethod == 1){
+        // FREQUENCY
+        sortFunction = function(a, b){
+            return b.value - a.value;
+        };
+    }
+    else if(sortMethod == 2){
+        // ALPHABETICAL
+        sortFunction = function(a, b){
+            return a.nodeName.localeCompare(b.nodeName)
+        };
+    }
+
+    nodeMap.sort(sortFunction);
+    for(i=0; i<nodeMap.length; i++){
+        nodes[nodeMap[i].index].displayOrder = i;
+    }
+}
