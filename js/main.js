@@ -1,4 +1,3 @@
-var miserables = require('./json_data.json')
 
 var i,
     width = 960,
@@ -13,8 +12,8 @@ var i,
     τ = 2 * Math.PI; // http://tauday.com/tau-manifesto
 
 var svg = d3.select("body").append("svg")
-        .attr("width", width)
-        .attr("height", height)
+    .attr("width", width)
+    .attr("height", height)
 
 function mapRange(value, inMin, inMax, outMin, outMax){
     var inVal = Math.min(Math.max(value, inMin), inMax);
@@ -30,7 +29,7 @@ for(i=0; i<nodes.length; i++){
 }
 for(i=0; i<links.length; i++){
     var link = links[i];
-        value = link.value;
+    value = link.value;
     nodes[link.source].value += link.value;
     nodes[link.target].value += link.value;
 }
@@ -43,11 +42,11 @@ var arcBuilder = d3.svg.arc()
     .startAngle(-τ/4)
     .endAngle(τ/4);
 arcBuilder.setRadii = function(d){
-        var arcHeight = 0.5 * Math.abs(d.x2-d.x1);
-        this
-            .innerRadius(arcHeight - d.thickness/2)
-            .outerRadius(arcHeight + d.thickness/2);
-    };
+    var arcHeight = 0.5 * Math.abs(d.x2-d.x1);
+    this
+        .innerRadius(arcHeight - d.thickness/2)
+        .outerRadius(arcHeight + d.thickness/2);
+};
 function arcTranslation(d){
     return "translate(" + (d.x1 + d.x2)/2 + "," + nodeY + ")";
 }
@@ -63,21 +62,21 @@ function update(){
         .data(links);
     // UPDATE
     path.transition()
-      .duration(transitionTime)
-      .call(pathTween, null);
+        .duration(transitionTime)
+        .call(pathTween, null);
     // ENTER
     path.enter()
         .append("path")
-        .attr("transform", function(d,i){ 
+        .attr("transform", function(d,i){
             d.x1 = nodeDisplayX(nodes[d.target]);
             d.x2 = nodeDisplayX(nodes[d.source]);
             return arcTranslation(d);
-            })
+        })
         .attr("d", function(d,i){
             d.thickness = 1 + d.value;
             arcBuilder.setRadii(d);
             return arcBuilder();
-            });
+        });
 
     // DATA JOIN
     var circle = svg.selectAll("circle")
